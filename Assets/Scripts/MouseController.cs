@@ -5,12 +5,12 @@ using UnityEngine;
 public class MouseController : MonoBehaviour
 {
     Vector2 mousePos;
-    Board board;
+    BoardHelper board;
     GameRules gameRules;
 
     void Start()
     {
-        board = Board.Instance;
+        board = BoardHelper.Instance;
         gameRules = GameRules.Instance;
     }
 
@@ -20,7 +20,7 @@ public class MouseController : MonoBehaviour
             return;
         if (gameRules.CurrentEnemy == GameRules.Enemy.None)
             return;
-        if (gameRules.CurrentEnemy != GameRules.Enemy.Human && gameRules.CurrentPlayer == Board.Cell.PawnB)
+        if (gameRules.CurrentEnemy != GameRules.Enemy.Human && gameRules.CurrentPlayer == BoardHelper.Cell.PawnB)
             return;
 
         mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);

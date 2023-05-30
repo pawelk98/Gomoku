@@ -23,7 +23,7 @@ public class UIController : MonoBehaviour
     [SerializeField]
     GameObject endScreen;
 
-    Board board;
+    BoardHelper board;
     GameRules gameRules;
     public static UIController Instance { get; private set; }
 
@@ -37,7 +37,7 @@ public class UIController : MonoBehaviour
 
     void Start()
     {
-        board = Board.Instance;
+        board = BoardHelper.Instance;
         gameRules = GameRules.Instance;
         replayBtn.onClick.AddListener(ReplayCallback);
         humanBtn.onClick.AddListener(() => EnemyCallback(GameRules.Enemy.Human));
@@ -75,11 +75,12 @@ public class UIController : MonoBehaviour
         }
 
         startScreen.SetActive(false);
+        gameRules.SetFirstPlayer();
     }
 
     public void ToggleEndScreen()
     {
-        if (gameRules.CurrentPlayer == Board.Cell.PawnA)
+        if (gameRules.CurrentPlayer == BoardHelper.Cell.PawnA)
             gameState.text = "Player A wins!";
         else
             gameState.text = "Player B wins!";

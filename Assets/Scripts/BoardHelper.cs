@@ -4,9 +4,9 @@ using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
 
-public class Board : MonoBehaviour
+public class BoardHelper : MonoBehaviour
 {
-    public enum Cell
+    public enum Cell : byte
     {
         Empty,
         PawnA,
@@ -16,15 +16,15 @@ public class Board : MonoBehaviour
         OutOfBoard
     }
 
-    public static Board Instance { get; private set; }
-    Cell[][] board;
+    public static BoardHelper Instance { get; private set; }
     List<GameObject> pawnGameObjects = new List<GameObject>();
     GameObject visualisation;
-    Vector2Int visualisationPos = new Vector2Int(-1,-1);
+    Vector2Int visualisationPos = new Vector2Int(-1, -1);
     GameRules gameRules;
     UIController uI;
     public bool GameStopped { get; private set; } = false;
-
+    public Vector2Int LastMove { get; private set; }
+    public Cell[][] Board { get; private set; }
 
     [SerializeField]
     float cellSize;
@@ -38,10 +38,10 @@ public class Board : MonoBehaviour
         else
             Instance = this;
 
-        board = new Cell[15][];
+        Board = new Cell[15][];
         for (int i = 0; i < 15; i++)
         {
-            board[i] = new Cell[15];
+            Board[i] = new Cell[15];
         }
     }
 
@@ -54,7 +54,7 @@ public class Board : MonoBehaviour
     public Vector2Int ApproxBoardPos(Vector2 pos)
     {
         Vector2Int newPos = ApproxRealPos(pos);
-        newPos.x += 7; 
+        newPos.x += 7;
         newPos.y += 7;
         return newPos;
     }
@@ -65,9 +65,9 @@ public class Board : MonoBehaviour
             Mathf.RoundToInt(pos.x / cellSize),
             Mathf.RoundToInt(pos.y / cellSize));
 
-        if(realPos.x < -7)
+        if (realPos.x < -7)
             realPos.x = -7;
-        else if(realPos.x > 7)
+        else if (realPos.x > 7)
             realPos.x = 7;
 
         if (realPos.y < -7)
@@ -78,22 +78,22 @@ public class Board : MonoBehaviour
         return realPos;
     }
 
-    public Vector2 BoardToRealPos(int x, int y)
+    public Vector2 BoardToRealPos(Vector2Int pos)
     {
-        Vector2 pos = new Vector2(
-            (x - 7) * cellSize,
-            (y - 7) * cellSize);
-        return pos;
+        Vector2 realPos = new Vector2(
+            (pos.x - 7) * cellSize,
+            (pos.y - 7) * cellSize);
+        return realPos;
     }
 
     public Cell GetCell(Vector2Int pos)
     {
         if (pos.x >= 0 && pos.x < 15 && pos.y >= 0 && pos.y < 15)
-            return board[pos.x][pos.y];
+            return Board[pos.x][pos.y];
         else
             return Cell.OutOfBoard;
     }
-    
+
     public void MouseHover(Cell pawn, Vector2Int pos)
     {
         if (GetCell(pos) != Cell.Empty)
@@ -108,21 +108,22 @@ public class Board : MonoBehaviour
             if (visualisation != null)
                 Destroy(visualisation);
             visualisationPos.Set(pos.x, pos.y);
-            visualisation = Instantiate(pawnPrefabs[(int)pawn + 1], BoardToRealPos(pos.x, pos.y), Quaternion.identity);
+            visualisation = Instantiate(pawnPrefabs[(int)pawn + 1], BoardToRealPos(pos), Quaternion.identity);
         }
     }
 
-    public void PlacePawn(Cell pawn, Vector2Int pos, bool temp = false)
+    public void PlacePawn(Cell pawn, Vector2Int pos)
     {
-        if (board[pos.x][pos.y] != Cell.Empty || pawn == Cell.Empty)
+        if (Board[pos.x][pos.y] != Cell.Empty || pawn == Cell.Empty)
             return;
 
         if (pawn == Cell.PawnA || pawn == Cell.PawnB)
         {
-            board[pos.x][pos.y] = pawn;
-            if(!temp)
-                pawnGameObjects.Add(Instantiate(pawnPrefabs[(int)pawn - 1], BoardToRealPos(pos.x, pos.y), Quaternion.identity));
-            if(visualisation != null)
+            Board[pos.x][pos.y] = pawn;
+            LastMove = pos;
+            pawnGameObjects.Add(Instantiate(pawnPrefabs[(int)pawn - 1], BoardToRealPos(pos), Quaternion.identity));
+
+            if (visualisation != null)
                 Destroy(visualisation);
             visualisationPos.Set(-1, -1);
             List<Vector2Int> winningPositions;
@@ -131,23 +132,14 @@ public class Board : MonoBehaviour
             {
                 GameStopped = true;
                 foreach (Vector2Int winningPos in winningPositions)
-                    if (!temp)
-                    {
-                        pawnGameObjects.Add(Instantiate(pawnPrefabs[(int)pawn + 3], BoardToRealPos(winningPos.x, winningPos.y), Quaternion.identity));
-                        uI.ToggleEndScreen();
-                    }
-            }    
+                    pawnGameObjects.Add(Instantiate(pawnPrefabs[(int)pawn + 3], BoardToRealPos(winningPos), Quaternion.identity));
+                uI.ToggleEndScreen();
+            }
             gameRules.SwitchPlayer();
         }
     }
 
-    public void UndoTempMove(Vector2Int pos)
-    {
-        board[pos.x][pos.y] = Cell.Empty;
-        GameStopped = false;
-    }
-
-    public List<Vector2Int> GetPossibleMoves()
+    public List<Vector2Int> GetPossibleMoves(int proximity)
     {
         List<Vector2Int> possibleMoves = new List<Vector2Int>();
 
@@ -156,11 +148,32 @@ public class Board : MonoBehaviour
 
         for (int x = 0; x < 15; x++)
             for (int y = 0; y < 15; y++)
-                if (board[x][y] == Cell.Empty)
-                    possibleMoves.Add(new Vector2Int(x, y));
+                if (Board[x][y] == Cell.Empty)
+                {
+                    if(CheckNeighbors(new Vector2Int(x,y), proximity))
+                        possibleMoves.Add(new Vector2Int(x, y));
+                }
 
+        Debug.Log($"Iloœæ ruchów: {possibleMoves.Count}");
         return possibleMoves;
     }
+
+    bool CheckNeighbors(Vector2Int pos, int range)
+    {
+        for (int x = pos.x - range; x <= pos.x + range; x++)
+        {
+            for (int y = pos.y - range; y <= pos.y + range; y++)
+            {
+                if (x < 0 || y < 0 || x >= 15 || y >= 15)
+                    continue;
+
+                if (Board[x][y] == Cell.PawnA || Board[x][y] == Cell.PawnB)
+                    return true;
+            }
+        }
+        return false;
+    }
+
 
     public void ResetBoard()
     {
@@ -169,12 +182,21 @@ public class Board : MonoBehaviour
 
         for (int x = 0; x < 15; x++)
         {
-            for(int y = 0; y < 15; y++)
-                board[x][y] = Cell.Empty;
+            for (int y = 0; y < 15; y++)
+                Board[x][y] = Cell.Empty;
         }
 
         GameStopped = false;
         gameRules.CurrentEnemy = GameRules.Enemy.None;
-        gameRules.SetFirstPlayer();
+    }
+
+    public void UndoAIMove(Vector2Int tempMove)
+    {
+        Board[tempMove.x][tempMove.y] = Cell.Empty;
+    }
+
+    public void TempAIMove(Vector2Int tempMove, Cell player)
+    {
+        Board[tempMove.x][tempMove.y] = player;
     }
 }
