@@ -1,1 +1,1 @@
-Gra planszowa gomoku dla 2 lokalnych graczy. Wykonana w silniku Unity.
+Gra planszowa gomoku wykorzystująca algorytm sztucznej inteligencji MinMax. Wykonana w silniku Unity.
